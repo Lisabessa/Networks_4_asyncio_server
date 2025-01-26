@@ -3,29 +3,39 @@ import asyncio
 HOST = 'localhost'
 PORT = 9095
 
-
 async def handle_echo(reader, writer):
-    data = await reader.read(100)
-    message = data.decode()
+    client_address = writer.get_extra_info('peername')
+    print(f'Подключен новый клиент: {client_address}')
 
-    writer.write(data)
-    await writer.drain()
+    while True:
+        # Чтение данных от клиента
+        data = await reader.read(100)
 
+        if not data:
+            print("Отключение клиента")
+            break
+
+        message = data.decode()
+        print(message)
+
+        # Отправка данных обратно клиенту
+        writer.write(data)
+        # Убеждаемся, что данные отправлены
+        await writer.drain()
+    
+    # Закрытие соединения
     writer.close()
 
 
-loop = asyncio.get_event_loop()
-coro = asyncio.start_server(handle_echo, HOST, PORT, loop=loop)
-server = loop.run_until_complete(coro)
+async def main():
+    server = await asyncio.start_server(handle_echo, HOST, PORT)
 
-# Serve requests until Ctrl+C is pressed
-print('Serving on {}'.format(server.sockets[0].getsockname()))
-try:
-    loop.run_forever()
-except KeyboardInterrupt:
-    pass
+    # Вывод информации о сервере
+    print(f'Сервер на {server.sockets[0].getsockname()}')
 
-# Close the server
-server.close()
-loop.run_until_complete(server.wait_closed())
-loop.close()
+    async with server:
+        await server.serve_forever()
+
+
+# Запуск сервера
+asyncio.run(main())
